@@ -1,29 +1,25 @@
 import java.io.BufferedReader;
-import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.RandomAccessFile;
 
 public class XTSAES {
 	public static void main(String[] args) throws Exception {
-		String plain = "C:\\Users\\Ramadhan\\Documents\\TestCIS\\plain123.txt";
+		/**
+		 * Yang gw command pake //
+		 * optional kayak lagi proses block berapa
+		 */
+		String plain = "C:\\Users\\Ramadhan\\Documents\\TestCIS\\punisherDecipher.png";
 		String key = "C:\\Users\\Ramadhan\\Documents\\TestCIS\\key.txt";
-		String cipher = "C:\\Users\\Ramadhan\\Documents\\TestCIS\\cipher.txt";
-		//XTSAES xts = new XTSAES(plain, key, cipher);
-		//xts.encrypt();
-		XTSAES xts = new XTSAES(cipher, key, plain);
-		xts.decrypt();
+		String cipher = "C:\\Users\\Ramadhan\\Documents\\TestCIS\\punishercipher.png";
+		XTSAES xts = new XTSAES(plain, key, cipher);
+		xts.encrypt();
+		//XTSAES xts = new XTSAES(cipher, key, plain);
+		//xts.decrypt();
 	}
     private String FILE_PLAIN;
     private String FILE_CIPHER;
     private String FILE_KEY;
-    private static int BLOCK_SIZE = 16;                     //128-bits (16-bytes)
-    private static int KEY_LENGTH_HEX = 64;                 //256-bits (32-bytes)
     private static byte[] nonce = Util.hex2byte("12345678901234567890123456789012");
-    private static int NUMBER_OF_THREAD = 100;
-    private byte[] nonceDP = null;
-    private byte[][] multiplyDP = null;
 
     public XTSAES(String plain, String key, String cipher) {
     	this.FILE_PLAIN = plain;
@@ -32,40 +28,104 @@ public class XTSAES {
     }
     
     public void encrypt() throws Exception {
-    	 Path path = Paths.get(this.FILE_PLAIN);
- 	     byte[] byteIn = Files.readAllBytes(path);
- 	     System.out.println(byteIn.length);
+    	RandomAccessFile inputBytes = new RandomAccessFile(this.FILE_PLAIN, "r");
+   	 	byte[][] ListBlockData = new byte[(int) inputBytes.length()/16 + 1][16];
+   	 	ListBlockData[(int) inputBytes.length()/16] = new byte[(int) inputBytes.length() % 16];
+        for (int a = 0; a < ListBlockData.length; a++) {
+            inputBytes.read(ListBlockData[a]);
+        }
+	     BufferedReader br = new BufferedReader (new FileReader(this.FILE_KEY));
+	     String key = br.readLine();
+  	     String key1 = key.substring(0, key.length()/2);
+  	 	 String key2 = key.substring(key.length()/2, key.length()); 	
+  	 	 br.close();
+  	 	 
+	     /**
+	      * Pisah menjadi block
+	      */
+  	 	 int jmlBlockPenuh = (int) (inputBytes.length() / AES.BLOCK_SIZE);
+	     byte[][] bufferOut = new byte[(int) (jmlBlockPenuh + 1)][AES.BLOCK_SIZE];
+	     bufferOut[jmlBlockPenuh] = new byte[(int) (inputBytes.length() % AES.BLOCK_SIZE)];
+	     byte[] key1Byte = Util.hex2byte(key1);
+	     byte[] key2Byte = Util.hex2byte(key2);
+	     
+	     
+	     
+	     for (int ii = 0; ii < jmlBlockPenuh - 1; ii++) {
+//	    	 System.out.println("Processing Block " + ii + " ...");
+	    	 bufferOut[ii] = blockEncrypt(ListBlockData[ii], key1Byte, key2Byte, nonce, ii);
+	     }
+	     
+	     
+	     /**
+	      * Handle check block terakhir
+	      * kalo terakhir full berarti jalanin lagi 2 kali encryptnya
+	      * kalo nggak, ciphertext stealing jalaninnya.
+	      */
+	     
+	     if(inputBytes.length() % AES.BLOCK_SIZE == 0) {
+//	    	 System.out.println("Processing Block " + (jmlBlockPenuh - 1) + " ...");
+	    	 bufferOut[jmlBlockPenuh - 1] = blockEncrypt(ListBlockData[jmlBlockPenuh - 1], key1Byte, key2Byte, nonce, jmlBlockPenuh - 1);
+	    	 
+	     }else {
+	    	 /**
+	    	  * Ciphertext stealing
+	    	  */
+	    	 int jumlahSisa = (int) inputBytes.length() % AES.BLOCK_SIZE;
+//	    	 System.out.println("Processing Block " + (jmlBlockPenuh) + " ...");
+	    	 byte[] xx = blockEncrypt(ListBlockData[jmlBlockPenuh - 1], key1Byte, key2Byte, nonce, jmlBlockPenuh - 1);
+	    	 System.arraycopy(xx, 0, bufferOut[jmlBlockPenuh], 0, jumlahSisa);
+	    	 byte[] cp = new byte[AES.BLOCK_SIZE - jumlahSisa];
+	    	 byte[] yy = new byte[AES.BLOCK_SIZE];
+	    	 for (int ii = jumlahSisa; ii < AES.BLOCK_SIZE; ii++) {
+	    		 cp[ii - jumlahSisa] = xx[ii];
+	    	 }
+	    	 System.arraycopy(ListBlockData[jmlBlockPenuh], 0, yy, 0, ListBlockData[jmlBlockPenuh].length);
+	    	 System.arraycopy(cp, 0, yy, ListBlockData[jmlBlockPenuh].length, cp.length);
+	    	 System.out.println("Processing Block " + (jmlBlockPenuh - 1) + " ...");
+	    	 bufferOut[jmlBlockPenuh - 1] = blockEncrypt(yy, key1Byte, key2Byte, nonce, jmlBlockPenuh);
+	     }
+	     
+	     
+	     /**
+	      * Output
+	      */
+        RandomAccessFile out = new RandomAccessFile(this.FILE_CIPHER, "rw");
+	     for (int a = 0; a < bufferOut.length; a++) {
+            out.write(bufferOut[a]);
+        }
+	     inputBytes.close();
+	     out.close();
+	     System.out.println("----------Encryption Done--------");
+  }
+    
+    public void decrypt() throws Exception {
+    	 RandomAccessFile inputBytes = new RandomAccessFile(this.FILE_PLAIN, "r");
+    	 byte[][] ListBlockData = new byte[(int) inputBytes.length()/16 + 1][16];
+    	 ListBlockData[(int) inputBytes.length()/16] = new byte[(int) inputBytes.length() % 16];
+         for (int a = 0; a < ListBlockData.length; a++) {
+             inputBytes.read(ListBlockData[a]);
+         }
  	     BufferedReader br = new BufferedReader (new FileReader(this.FILE_KEY));
  	     String key = br.readLine();
    	     String key1 = key.substring(0, key.length()/2);
-   	 	 String key2 = key.substring(key.length()/2, key.length()); 	
+   	 	 String key2 = key.substring(key.length()/2, key.length());
    	 	 br.close();
    	 	 
  	     /**
  	      * Pisah menjadi block
  	      */
- 	     int numBlock = (int )Math.ceil((byteIn.length) / (double) AES.BLOCK_SIZE);
- 	     byte[][] ListBlockData = new byte[numBlock][AES.BLOCK_SIZE];
- 	     //System.out.println(numBlock);
- 	     for(int ii = 0, jj = 0 ; ii < byteIn.length; ii++) {
- 	    	//System.out.print(byteIn[ii]);
- 	    	//System.out.print(jj);
- 	     	int num = ii % AES.BLOCK_SIZE;
- 	    	ListBlockData[jj][num] 
- 	    			= byteIn[ii];
- 	    	if(ii != 0 && num == 0) {
- 	    		jj++;
- 	    	}
- 	     };
- 	     System.out.println(numBlock);
- 	     byte[][] bufferOut = new byte[(int) (byteIn.length / AES.BLOCK_SIZE + 1)][AES.BLOCK_SIZE];
- 	     bufferOut[byteIn.length/AES.BLOCK_SIZE] = new byte[byteIn.length % AES.BLOCK_SIZE];
+   	 	 int jmlBlockPenuh = (int) (inputBytes.length() / AES.BLOCK_SIZE);
+ 	     byte[][] bufferOut = new byte[(int) (jmlBlockPenuh + 1)][AES.BLOCK_SIZE];
+ 	     bufferOut[jmlBlockPenuh] = new byte[(int) (inputBytes.length() % AES.BLOCK_SIZE)];
  	     byte[] key1Byte = Util.hex2byte(key1);
  	     byte[] key2Byte = Util.hex2byte(key2);
  	     
- 	     for (int ii = 0; ii < ListBlockData.length - 2; ii++) {
- 	    	 System.out.println("Processing Block " + ii + " ...");
- 	    	 bufferOut[ii] = blockEncrypt(ListBlockData[ii], key1Byte, key2Byte, nonce, ii);
+ 	     
+ 	     
+ 	     for (int ii = 0; ii < jmlBlockPenuh - 1; ii++) {
+// 	    	 System.out.println("Processing Block " + ii + " ...");
+ 	    	 bufferOut[ii] = blockDecrypt(ListBlockData[ii], key1Byte, key2Byte, nonce, ii);
  	     }
  	     
  	     
@@ -75,114 +135,41 @@ public class XTSAES {
  	      * kalo nggak, ciphertext stealing jalaninnya.
  	      */
  	     
-	     int indexBeforeLast = ListBlockData.length-2;
-	     int indexLast = ListBlockData.length-1;
- 	     if(byteIn.length % AES.BLOCK_SIZE == 0) {
- 	    	 System.out.println("Processing Block " + indexBeforeLast + " ...");
- 	    	 bufferOut[indexBeforeLast] = blockEncrypt(ListBlockData[indexBeforeLast], key1Byte, key2Byte, nonce, indexBeforeLast);
- 	    	 System.out.println("Processing Block " + indexLast + " ...");
- 	    	 bufferOut[indexLast] = blockEncrypt(ListBlockData[indexLast], key1Byte, key2Byte, nonce, indexLast);
+ 	     if(inputBytes.length() % AES.BLOCK_SIZE == 0) {
+// 	    	 System.out.println("Processing Block " + (jmlBlockPenuh - 1) + " ...");
+ 	    	 bufferOut[jmlBlockPenuh - 1] = blockDecrypt(ListBlockData[jmlBlockPenuh - 1], key1Byte, key2Byte, nonce, jmlBlockPenuh - 1);
  	    	 
  	     }else {
- 	    	 /**
- 	    	  * Ciphertext stealing
- 	    	  */
- 	    	 int jumlahSisa = byteIn.length % AES.BLOCK_SIZE;
- 	    	 System.out.println("Processing Block " + indexBeforeLast + " ...");
- 	    	 byte[] xx = blockEncrypt(ListBlockData[indexBeforeLast], key1Byte, key2Byte, nonce, indexBeforeLast);
- 	    	 System.arraycopy(xx, 0, bufferOut[indexLast], 0, jumlahSisa);
- 	    	 byte[] yy = new byte[AES.BLOCK_SIZE];
- 	    	 System.out.println("Processing Block " + indexLast + " ...");
- 	    	 System.arraycopy(ListBlockData[indexLast], 0, yy, 0, jumlahSisa);
- 	    	 System.arraycopy(xx, jumlahSisa, yy, jumlahSisa, AES.BLOCK_SIZE - jumlahSisa);
- 	    	 bufferOut[indexBeforeLast] = blockEncrypt(yy, key1Byte, key2Byte, nonce, indexLast);
+	    	 /**
+	    	  * Ciphertext stealing
+	    	  */
+	    	 int jumlahSisa = (int) inputBytes.length() % AES.BLOCK_SIZE;
+//	    	 System.out.println("Processing Block " + (jmlBlockPenuh) + " ...");
+	    	 byte[] xx = blockDecrypt(ListBlockData[jmlBlockPenuh - 1], key1Byte, key2Byte, nonce, jmlBlockPenuh);
+	    	 System.arraycopy(xx, 0, bufferOut[jmlBlockPenuh], 0, jumlahSisa);
+	    	 byte[] cp = new byte[AES.BLOCK_SIZE - jumlahSisa];
+	    	 byte[] yy = new byte[AES.BLOCK_SIZE];
+	    	 for (int ii = jumlahSisa; ii < AES.BLOCK_SIZE; ii++) {
+	    		 cp[ii - jumlahSisa] = xx[ii];
+	    	 }
+	    	 System.arraycopy(ListBlockData[jmlBlockPenuh], 0, yy, 0, ListBlockData[jmlBlockPenuh].length);
+	    	 System.arraycopy(cp, 0, yy, ListBlockData[jmlBlockPenuh].length, cp.length);
+	    	 System.out.println("Processing Block " + (jmlBlockPenuh - 1) + " ...");
+	    	 bufferOut[jmlBlockPenuh - 1] = blockDecrypt(yy, key1Byte, key2Byte, nonce, jmlBlockPenuh-1);
  	    	 
  	     }
+ 	     
  	     
  	     /**
  	      * Output
  	      */
- 	     //path = Paths.get(FILE_CIPHER);
- 	     System.out.println(bufferOut[2].length);
- 	     FileOutputStream stream = new FileOutputStream(this.FILE_CIPHER);
- 	     try {
- 	    	 for (int ii = 0; ii < bufferOut.length; ii++) {
- 	    		stream.write(bufferOut[ii]);
- 	    	 }
- 	    	 
- 	     } finally {
- 	    	 stream.close();
- 	     }
- 	     System.out.println("----------Encryption Done--------");
-    }
-    
-    public void decrypt() throws Exception {
-   	 Path path = Paths.get(this.FILE_PLAIN);
-	     byte[] byteIn = Files.readAllBytes(path);
-	     System.out.println(byteIn.length);
-	     BufferedReader br = new BufferedReader (new FileReader(this.FILE_KEY));
-	     String key = br.readLine();
-  	     String key1 = key.substring(0, key.length()/2);
-  	 	 String key2 = key.substring(key.length()/2, key.length()); 	
-  	 	 
-	     /**
-	      * Pisah menjadi block
-	      */
-	     
-	     int numBlock = (int )Math.ceil((byteIn.length) / (double) AES.BLOCK_SIZE);
-	     byte[][] ListBlockData = new byte[numBlock][AES.BLOCK_SIZE];
-	     for(int ii = 0, jj = 0 ; ii < byteIn.length; ii++) {
-	     	int num = ii % AES.BLOCK_SIZE;
-	    	ListBlockData[jj][num] = byteIn[ii];
-	    	if(ii != 0 && num == 0) {
-	    		jj++;
-	    	}
-	     };
- 	     byte[][] bufferOut = new byte[(int) (byteIn.length / AES.BLOCK_SIZE + 1)][AES.BLOCK_SIZE];
- 	     bufferOut[byteIn.length/AES.BLOCK_SIZE] = new byte[byteIn.length % AES.BLOCK_SIZE];
-	     byte[] key1Byte = Util.hex2byte(key1);
-	     byte[] key2Byte = Util.hex2byte(key2);
-	     
-	     for (int ii = 0; ii < ListBlockData.length - 2; ii++) {
-	    	 System.out.println("Processing Block " + ii + " ...");
-	    	 bufferOut[ii] = blockDecrypt(ListBlockData[ii], key1Byte, key2Byte, nonce, ii);
-	     }
-	     
-	     /**
-	      * Handle check block terakhir
-	      * kalo terakhir full berarti jalanin lagi 2 kali encryptnya
-	      * kalo nggak, ciphertext stealing jalaninnya.
-	      */
-	     System.out.println("--------Done Processing Blocks--------");
-	     int indexBeforeLast = ListBlockData.length-2;
-	     int indexLast = ListBlockData.length-1;
- 	     if(byteIn.length % AES.BLOCK_SIZE == 0) {
- 	    	 bufferOut[indexBeforeLast] = blockDecrypt(ListBlockData[indexBeforeLast], key1Byte, key2Byte, nonce, indexBeforeLast);
- 	    	 bufferOut[indexLast] = blockDecrypt(ListBlockData[indexLast], key1Byte, key2Byte, nonce, indexLast);
- 	    	 
- 	     }else {
- 	    	 /**
- 	    	  * Ciphertext stealing
- 	    	  */
- 	    	 int jumlahSisa = byteIn.length % AES.BLOCK_SIZE;
- 	    	 byte[] xx = blockDecrypt(ListBlockData[indexBeforeLast], key1Byte, key2Byte, nonce, indexBeforeLast);
- 	    	 System.arraycopy(xx, 0, bufferOut[indexLast], 0, jumlahSisa);
- 	    	 byte[] yy = new byte[AES.BLOCK_SIZE];
- 	    	 System.arraycopy(ListBlockData[indexLast], 0, yy, 0, jumlahSisa);
- 	    	 System.arraycopy(xx, jumlahSisa, yy, jumlahSisa, AES.BLOCK_SIZE - jumlahSisa);
- 	    	 bufferOut[indexBeforeLast] = blockDecrypt(yy, key1Byte, key2Byte, nonce, indexLast);
- 	    	 
- 	     }
- 	     
- 	     FileOutputStream stream = new FileOutputStream(this.FILE_CIPHER);
- 	     try {
- 	    	 for (int ii = 0; ii < bufferOut.length; ii++) {
- 	    		stream.write(bufferOut[ii]);
- 	    	 }
- 	    	 
- 	     } finally {
- 	    	 stream.close();
- 	     }
+         RandomAccessFile out = new RandomAccessFile(this.FILE_CIPHER, "rw");
+ 	     for (int a = 0; a < bufferOut.length; a++) {
+             out.write(bufferOut[a]);
+         }
+   	 	 inputBytes.close();
+ 	     out.close();
+ 	     System.out.println("----------Decryption Done--------");
    }
     
     
@@ -227,11 +214,15 @@ public class XTSAES {
     }
     
     private byte[] multiplyByAlphaJ(byte[] enc, int j) {
-    	byte[] ret = new byte[enc.length];
-    	ret[0] = (byte) ((2 * (enc[0] % 128)) ^ (135 * (enc[15] / 128)));
+    	byte[] ret = enc;
+    	if (j == 0) {
+    		return ret;
+    	}
+    	
     	for (int ii = 0; ii < j; ii++) {
+        	ret[0] = (byte) ((2 * (ret[0] % 128)) ^ (135 * (ret[15] / 128)));
     		for(int kk = 1; kk < 16; kk++) {
-    			ret[kk] = (byte) ((2 * (enc[kk] % 128 )) ^ (enc[kk-1] / 128));
+    			ret[kk] = (byte) ((2 * (ret[kk] % 128 )) ^ (ret[kk-1] / 128));
     		}
     	}
     	return ret;
