@@ -8,11 +8,11 @@ public class XTSAES {
 		 * Yang gw command pake //
 		 * optional kayak lagi proses block berapa
 		 */
-		String plain = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\dota 2 beta\\game\\bin\\win64\\dota2decipher.exe";
-		String key = "C:\\Users\\Ramadhan\\Documents\\TestCIS\\key.txt";
-		String cipher = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\dota 2 beta\\game\\bin\\win64\\dota2cipher.exe";
-		//XTSAES xts = new XTSAES(plain, key, cipher);
-		//xts.encrypt();
+		String plain = "D:\\CIS\\key and sources\\plain3.txt";
+		String key = "D:\\CIS\\key and sources\\keys.txt";
+		String cipher = "D:\\CIS\\key and sources\\cypher2.txt";
+//		XTSAES xts = new XTSAES(plain, key, cipher);
+//		xts.encrypt();
 		XTSAES xts = new XTSAES(cipher, key, plain);
 		xts.decrypt();
 	}

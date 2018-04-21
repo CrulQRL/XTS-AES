@@ -28,6 +28,7 @@ public class XTSAESFrame extends JFrame implements ActionListener{
 	private JButton decryptButton, encryptButton, keyBrowseButton, sourceBrowseButton, outputBrowseButton;
 	private JFileChooser selectedPath;
 	private String sourcePath, keyPath, outputPath;
+	private Controller controller;
 		
 	public XTSAESFrame(){
 		setDefaultCloseOperation( EXIT_ON_CLOSE );
@@ -74,7 +75,7 @@ public class XTSAESFrame extends JFrame implements ActionListener{
         keyJL.setVerticalTextPosition(SwingConstants.CENTER);
         keyJL.setLocation(35,135);
         
-        outputJL = new JLabel("Output:");
+        outputJL = new JLabel("Target:");
         outputJL.setHorizontalAlignment(SwingConstants.LEFT);
         outputJL.setSize(120,20);
         outputJL.setFont(new Font("Times New Roman",0,20));
@@ -136,7 +137,6 @@ public class XTSAESFrame extends JFrame implements ActionListener{
 		bottomPanel.add(decryptButton);
 	}
 
-	@Override
 	public void actionPerformed(ActionEvent e) {
 		if(e.getSource() == sourceBrowseButton){
 			sourcePath = openFileChooser();
@@ -148,9 +148,29 @@ public class XTSAESFrame extends JFrame implements ActionListener{
 			outputPath = openFileChooser();
 			outputJTF.setText(outputPath);
 		}else if(e.getSource() == encryptButton){
+			
+//			System.out.println(sourcePath +" "+ keyPath +" "+ outputPath);
+			
 			// do encrypt
+			controller = new Controller(sourcePath, keyPath, outputPath);
+			try {
+				controller.encrypt();
+			} catch (Exception e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 		}else if(e.getSource() == decryptButton){
+			
+//			System.out.println(sourcePath +" "+ keyPath +" "+ outputPath);
+			
 			// do decrypt
+			controller = new Controller(sourcePath, keyPath, outputPath);
+			try {
+				controller.decrypt();
+			} catch (Exception e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 		}
 	}
 	
