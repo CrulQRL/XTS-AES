@@ -8,18 +8,18 @@ public class XTSAES {
 		 * Yang gw command pake //
 		 * optional kayak lagi proses block berapa
 		 */
-		String plain = "C:\\Users\\Ramadhan\\Documents\\TestCIS\\punisherDecipher.png";
+		String plain = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\dota 2 beta\\game\\bin\\win64\\dota2decipher.exe";
 		String key = "C:\\Users\\Ramadhan\\Documents\\TestCIS\\key.txt";
-		String cipher = "C:\\Users\\Ramadhan\\Documents\\TestCIS\\punishercipher.png";
-		XTSAES xts = new XTSAES(plain, key, cipher);
-		xts.encrypt();
-		//XTSAES xts = new XTSAES(cipher, key, plain);
-		//xts.decrypt();
+		String cipher = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\dota 2 beta\\game\\bin\\win64\\dota2cipher.exe";
+		//XTSAES xts = new XTSAES(plain, key, cipher);
+		//xts.encrypt();
+		XTSAES xts = new XTSAES(cipher, key, plain);
+		xts.decrypt();
 	}
     private String FILE_PLAIN;
     private String FILE_CIPHER;
     private String FILE_KEY;
-    private static byte[] nonce = Util.hex2byte("12345678901234567890123456789012");
+    private static byte[] nonce = Util.hex2byte("89012345678901234567890123456789");
 
     public XTSAES(String plain, String key, String cipher) {
     	this.FILE_PLAIN = plain;
